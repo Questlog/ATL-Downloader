@@ -1,4 +1,4 @@
-import httplib2, sys, os, uuid, json, urllib, zipfile, textwrap
+import httplib2, sys, os, uuid, json, urllib, zipfile, textwrap, getpass
 from xml.dom import minidom
 
 class ATLDownloader:
@@ -12,7 +12,9 @@ class ATLDownloader:
         self.__minecraftversion = ""
         self.__optionalModsToDownload = []
 
-    def getMinecraftLogin(self, username, password):
+    def _getMinecraftLogin(self, username):
+        password = getpass.getpass("Enter the password of user ["+username+"]: ")
+
         authRequest = json.dumps({
           "agent": {
               "name":"Minecraft",
@@ -38,7 +40,8 @@ class ATLDownloader:
                str(authResponse["accessToken"]), \
                str(authResponse["clientToken"]) # ist die UUID von oben
 
-    def getAuthKey(self, username, accessToken, clientToken):
+    def getAuthKey(self, username):
+        username, accessToken, clientToken = self._getMinecraftLogin(username)
         print urllib.urlencode({"username" : username, "accessToken" : accessToken, "clientToken" : clientToken})
 
         resp, content = self.h.request(
@@ -272,13 +275,13 @@ if __name__ == "__main__":
         ),
         epilog=textwrap.dedent(
 '''usage examples:
-  %(prog)s -l MCplayer123 MyPassword ResonantRise 2.8.3.4-RR-MAIN
-  %(prog)s -l super@duper.com Password SkyFactory 1.2
+  %(prog)s -l MCplayer123 ResonantRise 2.8.3.4-RR-MAIN
+  %(prog)s -l super@duper.com SkyFactory 1.2
   %(prog)s -k 64567247h456dzh5356jw5kdfh933458|568536736 YogscastCompletePack 2.8.3.4-RR-YOGS
 '''),
     )
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("-l", "--login", nargs=2, help="Your Minecraft.com username and password", metavar=("Username","Password"))
+    group.add_argument("-l", "--login", help="Your Minecraft.com username, the password will be prompted.", metavar=("Username"))
     group.add_argument("-k", "--authKey", help="The authkey you get after logging in.")
     parser.add_argument("modpackname", help="The exact name of the modpack you want do download")
     parser.add_argument("modpackversion", help="The version of the modpack")
@@ -292,13 +295,12 @@ if __name__ == "__main__":
     atldl = ATLDownloader()
 
     if args.login is not None:
-        username, accessToken, clientToken = atldl.getMinecraftLogin(args.login[0], args.login[1])
-        authKey = atldl.getAuthKey(username, accessToken, clientToken)
+        authKey = atldl.getAuthKey(args.login)
     else:
         authKey = args.authKey
 
     headers = atldl.createHeader(authKey)
-    modlist = atldl.getModlist(headers, args.modpackname, args.modpackversion, safeToFile=True)
+    modlist = atldl.getModlist(headers, args.modpackname, args.modpackversion, safeToFile=False)
 
     atldl.downloadLibraries(headers, modlist)
     atldl.downloadMods(headers, modlist)
